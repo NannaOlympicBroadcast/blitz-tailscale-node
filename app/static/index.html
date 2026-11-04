@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blitz Tailscale Exit Node & SOCKS5h Gateway</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .glass { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
+    pre, code { font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+  <div class="max-w-4xl mx-auto w-full space-y-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-600/30">
+          🌐
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white">Blitz Tailscale Exit Node & SOCKS5h</h1>
+          <p class="text-xs text-slate-400">德国 Hetzner 高速出口 · 原生 Exit Node · SOCKS5h 代理服务</p>
+        </div>
+      </div>
+      <button onclick="refreshStatus()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition">
+        刷新状态
+      </button>
+    </header>
+
+    <!-- Node Status Cards -->
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="glass p-4 rounded-xl space-y-1">
+        <div class="text-xs text-slate-400">Tailnet 连接状态</div>
+        <div id="stat-conn" class="text-base font-bold text-amber-400">检查中...</div>
+        <div id="stat-tailnet" class="text-xs text-slate-500">-</div>
+      </div>
+      <div class="glass p-4 rounded-xl space-y-1">
+        <div class="text-xs text-slate-400">Tailscale IPv4 地址</div>
+        <div id="stat-ip" class="text-base font-mono font-bold text-indigo-400">-</div>
+        <div id="stat-dns" class="text-xs font-mono text-slate-500 truncate">-</div>
+      </div>
+      <div class="glass p-4 rounded-xl space-y-1">
+        <div class="text-xs text-slate-400">容器防休眠保活 (180s)</div>
+        <div id="stat-keepalive" class="text-base font-bold text-emerald-400">运行中</div>
+        <div id="stat-pings" class="text-xs text-slate-500">已执行 0 次探测</div>
+      </div>
+    </div>
+
+    <!-- Connect Box (When not connected) -->
+    <div id="connect-box" class="glass p-5 rounded-xl space-y-3 hidden">
+      <h2 class="text-base font-semibold text-white">🔑 连接到你的 Tailscale 网络 (Tailnet)</h2>
+      <p class="text-xs text-slate-400">
+        从 <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" class="text-indigo-400 underline">Tailscale 控制台生成 AuthKey</a>，粘贴后点击一键接入：
+      </p>
+      <form onsubmit="handleConnect(event)" class="space-y-3">
+        <div class="grid md:grid-cols-3 gap-3">
+          <input id="ts-key" type="password" required placeholder="tskey-auth-k..." class="md:col-span-2 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-white" />
+          <input id="ts-hname" type="text" value="blitz-de-exit" placeholder="节点名称" class="px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white" />
+        </div>
+        <button id="btn-submit" type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30">
+          立即加入 Tailnet 并宣告 Exit Node
+        </button>
+      </form>
+    </div>
+
+    <!-- Usage Guides -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Method 1: SOCKS5h Proxy -->
+      <div class="glass p-5 rounded-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <span>⚡ 方式一：SOCKS5h 代理 (按需直连)</span>
+          </h2>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">免切全局路由</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          连接到同一 Tailnet 的任何电脑/手机，可直接将本地浏览器或命令行代理指向该节点的 1080 端口（支持远程 DNS 解析）：
+        </p>
+        <div class="space-y-1.5">
+          <div class="text-xs text-slate-400">代理连接地址 (SOCKS5h)：</div>
+          <div class="flex gap-2">
+            <input id="proxy-socks" readonly class="flex-1 px-3 py-2 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300" />
+            <button onclick="copyVal('proxy-socks')" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-white">复制</button>
+          </div>
+          <div class="text-xs text-slate-400 pt-1">HTTP 代理地址 (可选)：</div>
+          <div class="flex gap-2">
+            <input id="proxy-http" readonly class="flex-1 px-3 py-2 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300" />
+            <button onclick="copyVal('proxy-http')" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-white">复制</button>
+          </div>
+        </div>
+        <div class="pt-2">
+          <div class="text-xs text-slate-400 mb-1">测试命令 (cURL / 命令行)：</div>
+          <pre id="curl-cmd" class="p-2.5 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto"></pre>
+        </div>
+      </div>
+
+      <!-- Method 2: Tailscale Exit Node -->
+      <div class="glass p-5 rounded-xl space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <span>🌍 方式二：全局 Exit Node 出口</span>
+          </h2>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300">系统全局分流</span>
+        </div>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          作为 Tailscale 官方 Exit Node，将整个设备的网络流量通过该节点转发（出口 IP 为德国 Hetzner）：
+        </p>
+        <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1.5">
+          <li>
+            前往 <a href="https://login.tailscale.com/admin/machines" target="_blank" class="text-indigo-400 underline">Tailscale 机器管理后台</a>
+          </li>
+          <li>找到本节点名称（<code id="node-name-label" class="text-indigo-300">blitz-de-exit</code>）</li>
+          <li>点击右侧菜单 <code class="text-slate-400">...</code> ➔ <code class="text-slate-400">Edit route settings</code></li>
+          <li>勾选批准 <strong class="text-emerald-400">Use as exit node</strong></li>
+          <li>在客户端选择该节点为出口：
+            <pre class="mt-1.5 p-2 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300">tailscale set --exit-node=blitz-de-exit</pre>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        const ts = data.tailscale || {};
+        const isConn = ts.connected;
+        const connEl = document.getElementById('stat-conn');
+        connEl.textContent = isConn ? '已连接 (Running)' : '未连接 (等待 AuthKey)';
+        connEl.className = `text-base font-bold ${isConn ? 'text-emerald-400' : 'text-amber-400'}`;
+        document.getElementById('stat-tailnet').textContent = ts.tailnet ? `Tailnet: ${ts.tailnet}` : (ts.raw || '-');
+        
+        const ip = ts.tailscale_ip_v4 || '未分配';
+        document.getElementById('stat-ip').textContent = ip;
+        document.getElementById('stat-dns').textContent = ts.node_name || '-';
+        document.getElementById('node-name-label').textContent = ts.host_name || 'blitz-de-exit';
+
+        const ka = data.keepalive || {};
+        document.getElementById('stat-pings').textContent = `累计保活 ${ka.ping_count || 0} 次 · ${ka.last_status || '待触发'}`;
+
+        document.getElementById('proxy-socks').value = data.socks5h_proxy;
+        document.getElementById('proxy-http').value = data.http_proxy;
+        document.getElementById('curl-cmd').textContent = `curl -x ${data.socks5h_proxy} https://ipinfo.io/json`;
+
+        document.getElementById('connect-box').classList.toggle('hidden', isConn);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function handleConnect(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.textContent = '正在连接 Tailnet...';
+      try {
+        const key = document.getElementById('ts-key').value;
+        const hname = document.getElementById('ts-hname').value;
+        const res = await fetch('/api/connect', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({authkey: key, hostname: hname})
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.detail || '连接失败');
+        alert('Tailscale 连接成功！');
+        refreshStatus();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '立即加入 Tailnet 并宣告 Exit Node';
+      }
+    }
+
+    function copyVal(id) {
+      const el = document.getElementById(id);
+      navigator.clipboard.writeText(el.value);
+      alert('已复制: ' + el.value);
+    }
+
+    refreshStatus();
+    setInterval(refreshStatus, 8000);
+  </script>
+</body>
+</html>
