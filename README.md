@@ -68,11 +68,12 @@ curl -x socks5h://<TAILSCALE_IP>:1080 https://ipinfo.io/json
 
 ---
 
-## 💓 容器防休眠机制
+## 💓 容器双层防休眠保活机制 (Dual-Layer Keep-Alive)
 
-Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态。本容器内集成了高可靠性防休眠机制：
-- 容器内后台任务每 **180 秒（3 分钟）** 向自身公网域名发起携带防缓存时间戳的健康请求；
-- 确保 Blitz 边缘网关的活跃时间戳始终保持在 3 分钟以内，无需外部 CI 即可全天候保活。
+Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态。本节点容器集成了与凭据管理器同等级别的双层保活架构：
+1. **进程外独立脚本守护**：`/app/scripts/keepalive.py` 在容器后台常驻，每 **180 秒（3 分钟）** 向自身的公网健康检查接口（`https://ts-exit.blitz48.blitz.cloud/api/health`）发起一次携带毫秒级时间戳的 HTTPS 探测，若网络偶尔抖动失败，自动在 **15 秒内重试**；
+2. **进程内异步协程兜底**：FastAPI 后台协程 `_keepalive_loop` 同样以 180 秒为周期进行公网回环保活；
+3. **状态透明可查**：可通过访问 Web 控制台首页或直接请求 `GET /api/status` 实时查看累计保活探测次数与最近一次成功响应时间。
 
 ---
 
@@ -81,10 +82,12 @@ Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态�
 ```text
 blitz-tailscale-node/
 ├── app/
-│   ├── main.py            # FastAPI 控制台后端 + Tailscale 状态管理 + 防休眠协程
+│   ├── main.py            # FastAPI 控制台后端 + Tailscale 状态管理 + 协程保活
 │   └── static/
 │       └── index.html     # Web 控制台界面 (展示 Tailscale IP、连接表单、SOCKS5 使用指引)
-├── entrypoint.sh          # 容器启动入口 (拉起 tailscaled userspace 与 Web 服务)
+├── scripts/
+│   └── keepalive.py       # 容器内独立运行的 Python 防休眠保活守护脚本 (180s 周期)
+├── entrypoint.sh          # 容器启动入口 (拉起 tailscaled userspace、keepalive.py 与 Web 服务)
 ├── Dockerfile             # 包含官方 Tailscale 静态二进制的构建文件 (持久化 /app/data)
 ├── requirements.txt       # Python 依赖
 └── README.md              # 完整使用说明文档

@@ -20,5 +20,10 @@ for i in $(seq 1 10); do
   sleep 1
 done
 
+echo "[KeepAlive] Starting standalone keep-alive daemon..."
+python /app/scripts/keepalive.py \
+  --url "${KEEPALIVE_URL:-https://ts-exit.blitz48.blitz.cloud/api/health}" \
+  --interval "${KEEPALIVE_INTERVAL:-180}" &
+
 echo "[App] Starting Web & KeepAlive Server on 0.0.0.0:${PORT:-8000}..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

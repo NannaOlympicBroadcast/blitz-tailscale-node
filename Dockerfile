@@ -34,8 +34,9 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY app /app/app
+COPY scripts /app/scripts
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh && mkdir -p /app/data
+RUN chmod +x /app/entrypoint.sh /app/scripts/*.py && mkdir -p /app/data
 
 VOLUME ["/app/data"]
 EXPOSE 8000

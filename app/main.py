@@ -129,7 +129,12 @@ async def on_startup():
 
 
 @app.get("/api/health")
-def health():
+def health(request: Request):
+    ua = request.headers.get("user-agent", "")
+    if "KeepAlive" in ua or "_src" in request.query_params or "_t" in request.query_params:
+        KEEPALIVE_STATE["ping_count"] += 1
+        KEEPALIVE_STATE["last_ping_at"] = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime())
+        KEEPALIVE_STATE["last_status"] = f"OK from {ua}"
     return {"status": "ok", "service": "blitz-tailscale-node", "time": time.time()}
 
 
