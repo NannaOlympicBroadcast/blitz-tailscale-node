@@ -18,7 +18,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 TS_STATE_DIR = DATA_DIR / "tailscale"
 TS_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
-APP_URL = os.environ.get("PUBLIC_SERVER_URL", "https://tailscale-exit.blitz48.blitz.cloud")
+APP_URL = os.environ.get("PUBLIC_SERVER_URL", "https://ts-exit.blitz48.blitz.cloud")
 KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", "180"))
 
 app = FastAPI(title="Blitz Tailscale Exit & SOCKS5 Node", version="1.0.0")
@@ -77,7 +77,7 @@ def get_tailscale_status() -> Dict[str, Any]:
             "tailnet": data.get("CurrentTailnet", {}).get("Name"),
             "exit_node_option": bool(self_node.get("ExitNodeOption")),
             "online": self_node.get("Online", False),
-            "peers_count": len(data.get("Peer", {})),
+            "peers_count": len(data.get("Peer") or {}),
         }
     except Exception as e:
         return {"connected": False, "error": str(e), "raw": out}

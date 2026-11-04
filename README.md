@@ -27,7 +27,7 @@
 ## 🚀 部署与使用流程
 
 ### 1. 接入 Tailnet (连接网络)
-1. 访问部署好的 Web 控制台地址：`https://tailscale-exit.blitz48.blitz.cloud`；
+1. 访问部署好的 Web 控制台地址：`https://ts-exit.blitz48.blitz.cloud`；
 2. 前往 [Tailscale 控制台生成 AuthKey](https://login.tailscale.com/admin/settings/keys)；
 3. 在页面输入框粘贴 `tskey-auth-...` 并点击「立即加入 Tailnet」；
    *(或在 Blitz 环境变量中配置 `TS_AUTHKEY`，应用启动时会自动完成注册)*；

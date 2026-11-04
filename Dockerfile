@@ -38,6 +38,6 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh && mkdir -p /app/data
 
 VOLUME ["/app/data"]
-EXPOSE 8000 1080 8080
+EXPOSE 8000
 
 CMD ["/app/entrypoint.sh"]

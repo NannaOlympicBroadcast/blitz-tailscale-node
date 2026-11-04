@@ -7,6 +7,7 @@ echo "[Tailscale] Starting tailscaled in userspace-networking mode (SOCKS5: 0.0.
 tailscaled \
   --tun=userspace-networking \
   --statedir=/app/data/tailscale \
+  --port=41641 \
   --socks5-server=0.0.0.0:1080 \
   --outbound-http-proxy-listen=0.0.0.0:8080 &
 
