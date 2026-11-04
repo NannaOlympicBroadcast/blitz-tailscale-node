@@ -68,12 +68,13 @@ curl -x socks5h://<TAILSCALE_IP>:1080 https://ipinfo.io/json
 
 ---
 
-## 💓 容器双层防休眠保活机制 (Dual-Layer Keep-Alive)
+## 💓 容器双层防休眠保活机制 (Dual-Layer & Cross-Ping Keep-Alive)
 
 Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态。本节点容器集成了与凭据管理器同等级别的双层保活架构：
 1. **进程外独立脚本守护**：`/app/scripts/keepalive.py` 在容器后台常驻，每 **180 秒（3 分钟）** 向自身的公网健康检查接口（`https://ts-exit.blitz48.blitz.cloud/api/health`）发起一次携带毫秒级时间戳的 HTTPS 探测，若网络偶尔抖动失败，自动在 **15 秒内重试**；
-2. **进程内异步协程兜底**：FastAPI 后台协程 `_keepalive_loop` 同样以 180 秒为周期进行公网回环保活；
-3. **状态透明可查**：可通过访问 Web 控制台首页或直接请求 `GET /api/status` 实时查看累计保活探测次数与最近一次成功响应时间。
+2. **跨容器双向互保活 (Cross-Ping)**：保活守护进程每次循环同时向对端应用 `https://cred-manager.blitz48.blitz.cloud/api/health` 发起真实的跨公网回环健康请求，确保两个应用容器全天候在线，永不休眠；
+3. **Tailnet 端口自暴露 (Auto-Serve)**：由于 Tailscale 运行在用户态网络栈模式下，脚本与入口逻辑已自动注册 `tailscale serve --bg --tcp=1080` 与 `tailscale serve --bg --tcp=8080`，确保 Tailnet 内部 peer 节点发往 `100.x.y.z:1080` 的 SOCKS5h 流量被 netstack 正确解包与路由；
+4. **状态透明可查**：可通过访问 Web 控制台首页或直接请求 `GET /api/status` 实时查看累计保活探测次数与最近一次成功响应时间。
 
 ---
 

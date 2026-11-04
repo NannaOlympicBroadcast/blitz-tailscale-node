@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 
 DEFAULT_URL = os.environ.get("KEEPALIVE_URL", "https://ts-exit.blitz48.blitz.cloud/api/health")
+PEER_URL = os.environ.get("PEER_KEEPALIVE_URL", "https://cred-manager.blitz48.blitz.cloud/api/health")
 DEFAULT_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", "180"))
 
 
@@ -57,8 +58,13 @@ def main():
     while True:
         ok, detail = ping_once(args.url)
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{now}] {'OK' if ok else 'ERR'} | {detail}", flush=True)
-        # Fast retry in 15 seconds if failed, otherwise wait the normal interval
+        print(f"[{now}] self -> {'OK' if ok else 'ERR'} | {detail}", flush=True)
+        # Cross-ping peer container to keep it awake as well
+        if PEER_URL:
+            try:
+                ping_once(PEER_URL)
+            except Exception:
+                pass
         sleep_time = args.interval if ok else 15
         time.sleep(sleep_time)
 

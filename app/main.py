@@ -126,6 +126,9 @@ async def on_startup():
         ]
         code, out = run_cmd(cmd, timeout=30)
         print(f"[Tailscale up] code={code}: {out}")
+        run_cmd(["tailscale", "serve", "reset"], timeout=5)
+        run_cmd(["tailscale", "serve", "--bg", "--tcp=1080", "tcp://127.0.0.1:1080"], timeout=10)
+        run_cmd(["tailscale", "serve", "--bg", "--tcp=8080", "tcp://127.0.0.1:8080"], timeout=10)
 
 
 @app.get("/api/health")
@@ -175,6 +178,9 @@ def connect_tailscale(req: ConnectRequest):
     code, out = run_cmd(cmd, timeout=35)
     if code != 0:
         raise HTTPException(status_code=500, detail=f"Tailscale connection failed: {out}")
+    run_cmd(["tailscale", "serve", "reset"], timeout=5)
+    run_cmd(["tailscale", "serve", "--bg", "--tcp=1080", "tcp://127.0.0.1:1080"], timeout=10)
+    run_cmd(["tailscale", "serve", "--bg", "--tcp=8080", "tcp://127.0.0.1:8080"], timeout=10)
     return {"status": "connected", "output": out, "info": get_tailscale_status()}
 
 
