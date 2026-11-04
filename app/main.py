@@ -8,9 +8,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data"))
@@ -20,6 +20,7 @@ TS_STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_URL = os.environ.get("PUBLIC_SERVER_URL", "https://ts-exit.blitz48.blitz.cloud")
 KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", "180"))
+TUNNEL_TOKEN = os.environ.get("TUNNEL_TOKEN", "snh48ssr")
 
 app = FastAPI(title="Blitz Tailscale Exit & SOCKS5 Node", version="1.0.0")
 
@@ -182,6 +183,72 @@ def connect_tailscale(req: ConnectRequest):
     run_cmd(["tailscale", "serve", "--bg", "--tcp=1080", "tcp://127.0.0.1:1080"], timeout=10)
     run_cmd(["tailscale", "serve", "--bg", "--tcp=8080", "tcp://127.0.0.1:8080"], timeout=10)
     return {"status": "connected", "output": out, "info": get_tailscale_status()}
+
+
+@app.websocket("/tunnel")
+async def ws_socks5_tunnel(websocket: WebSocket, token: Optional[str] = None):
+    # Security Token Verification
+    tok = token or websocket.query_params.get("token") or websocket.headers.get("x-tunnel-token")
+    if tok != TUNNEL_TOKEN:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    try:
+        reader, writer = await asyncio.open_connection("127.0.0.1", 1080)
+    except Exception as e:
+        await websocket.close(code=1011, reason=f"Cannot reach local SOCKS5: {e}")
+        return
+
+    async def ws_to_tcp():
+        try:
+            while True:
+                data = await websocket.receive_bytes()
+                if not data:
+                    break
+                writer.write(data)
+                await writer.drain()
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        except Exception:
+            pass
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+
+    async def tcp_to_ws():
+        try:
+            while True:
+                data = await reader.read(65536)
+                if not data:
+                    break
+                await websocket.send_bytes(data)
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        except Exception:
+            pass
+        finally:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+    t1 = asyncio.create_task(ws_to_tcp())
+    t2 = asyncio.create_task(tcp_to_ws())
+    await asyncio.wait([t1, t2], return_when=asyncio.FIRST_COMPLETED)
+    t1.cancel()
+    t2.cancel()
+
+
+@app.get("/client/tunnel.py")
+def get_client_script():
+    client_path = Path(__file__).resolve().parent.parent / "client" / "tunnel.py"
+    if client_path.exists():
+        return PlainTextResponse(client_path.read_text(encoding="utf-8"), media_type="text/x-python")
+    raise HTTPException(status_code=404, detail="tunnel.py not found")
 
 
 @app.get("/", response_class=HTMLResponse)

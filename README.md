@@ -2,9 +2,10 @@
 
 基于 **Blitz.cloud**（德国 Hetzner 数据中心节点）部署的 **Tailscale 出口节点（Exit Node）与内网 SOCKS5h / HTTP 代理网关**。
 
-无需公网暴露任何代理端口，全链路运行在你的私有 **Tailnet** 虚拟内网内；支持两种并行访问方式：
-1. **SOCKS5h 代理模式**：免切全局路由，Tailnet 内部设备直接指定 `socks5h://100.x.y.z:1080`，支持远端 DNS 解析；
-2. **Tailscale 全局 Exit Node 模式**：通过官方 Exit Node 协议，将手机或电脑全局流量通过德国 Hetzner 高速出口转发。
+无需公网暴露任何代理端口，全链路安全加密；支持三种访问方式：
+1. **🚀 极速 WebSocket 隧道模式（强烈推荐）**：通过 Blitz 的 Cloudflare Anycast CDN 隧道直连容器内 SOCKS5 网关，彻底绕开 Tailscale 跨国中继 DERP 0.1 Mbps 限速，实测跑满百兆带宽；
+2. **SOCKS5h 局域内网模式**：免切全局路由，Tailnet 内部设备直接指定 `socks5h://100.x.y.z:1080`，支持远端 DNS 解析；
+3. **Tailscale 全局 Exit Node 模式**：通过官方 Exit Node 协议，将手机或电脑全局流量通过德国 Hetzner 高速出口转发。
 
 ---
 
@@ -68,6 +69,33 @@ curl -x socks5h://<TAILSCALE_IP>:1080 https://ipinfo.io/json
 
 ---
 
+### 4. 方式三：🚀 极速 CDN WebSocket 隧道加速 (解决 Tailscale DERP 0.1 Mbps 慢速瓶颈)
+
+#### 为什么需要极速隧道？
+当本地客户端网络处于对称型 NAT 环境时，Tailscale 无法与容器完成 UDP P2P 直连打洞，流量会自动 fallback 回退至 Tailscale 位于美国旧金山的官方免费中继服务器 `DERP(sfo)`。跨洋往返延迟高（300~600ms）且官方 DERP 严格限制单连接吞吐（实测仅 0.1 Mbps / 20 KB/s）。
+
+为此，容器内置了 **WebSocket 隧道全双工网关**（`/tunnel`），本地使用内置零依赖 Python 客户端一键打通至 Blitz 的 Cloudflare Anycast CDN，直达德国 Hetzner 出口，彻底跑满本地与云端带宽！
+
+#### 极速启动与测速（Windows / macOS / Linux 均通用）
+
+**Step 1. 运行本地隧道守护客户端（纯 Python 标准库，零 pip 依赖）**
+```powershell
+# 在 Windows PowerShell 下执行（自动从容器拉取最新客户端并运行）
+irm https://ts-exit.blitz48.blitz.cloud/client/tunnel.py -OutFile tunnel.py; python tunnel.py
+```
+> 客户端将在本地启动 `socks5h://127.0.0.1:1080` 代理监听，所有请求通过 TLS WebSocket 隧道加密转发至 Blitz 容器。
+
+**Step 2. 在另一个终端测试出口 IP 与带宽**
+```powershell
+# 1. 检验公网出口 IP（德国 Falkenstein Hetzner）
+curl.exe -x socks5h://127.0.0.1:1080 https://ipinfo.io/json
+
+# 2. 真实大文件下载测速（测试 25MB 数据块）
+curl.exe -x socks5h://127.0.0.1:1080 -w "HTTP状态: %{http_code}\n耗时: %{time_total}s\n平均下载速度: %{speed_download} B/s\n" -o NUL -s -S https://speed.cloudflare.com/__down?bytes=26214400
+```
+
+---
+
 ## 💓 容器双层防休眠保活机制 (Dual-Layer & Cross-Ping Keep-Alive)
 
 Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态。本节点容器集成了与凭据管理器同等级别的双层保活架构：
@@ -83,9 +111,11 @@ Blitz 平台默认在 15 分钟无公网 HTTP 请求时自动进入休眠状态�
 ```text
 blitz-tailscale-node/
 ├── app/
-│   ├── main.py            # FastAPI 控制台后端 + Tailscale 状态管理 + 协程保活
+│   ├── main.py            # FastAPI 控制台后端 + WebSocket 隧道网关 + Tailscale 状态管理
 │   └── static/
-│       └── index.html     # Web 控制台界面 (展示 Tailscale IP、连接表单、SOCKS5 使用指引)
+│       └── index.html     # Web 控制台界面 (展示 Tailscale IP、连接表单、极速隧道指引)
+├── client/
+│   └── tunnel.py          # 跨平台零依赖 Python WebSocket 隧道客户端
 ├── scripts/
 │   └── keepalive.py       # 容器内独立运行的 Python 防休眠保活守护脚本 (180s 周期)
 ├── entrypoint.sh          # 容器启动入口 (拉起 tailscaled userspace、keepalive.py 与 Web 服务)

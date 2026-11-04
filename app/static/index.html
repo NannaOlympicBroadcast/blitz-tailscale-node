@@ -66,17 +66,37 @@
     </div>
 
     <!-- Usage Guides -->
-    <div class="grid md:grid-cols-2 gap-6">
+    <div class="grid md:grid-cols-3 gap-6">
+      <!-- Method 0: High-Speed WebSocket CDN Tunnel -->
+      <div class="glass p-5 rounded-xl space-y-3 border-indigo-500/40 shadow-xl shadow-indigo-500/10">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-white flex items-center gap-1.5">
+            <span>🚀 极速 CDN 隧道 (推荐)</span>
+          </h2>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-900 border border-indigo-700 text-indigo-200">免中继 / 跑满带宽</span>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed">
+          绕过 Tailscale 跨国劣化的免费中继，直接走 <strong>Cloudflare Anycast 国际 CDN 专线</strong>直达德国 Hetzner 出口，速度提升 100~300 倍。
+        </p>
+        <div class="space-y-1.5 text-xs">
+          <div class="text-slate-400">Windows PowerShell 一键启动本地 SOCKS5 代理：</div>
+          <pre class="p-2.5 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto whitespace-pre-wrap select-all">irm https://ts-exit.blitz48.blitz.cloud/client/tunnel.py -OutFile tunnel.py; python tunnel.py</pre>
+          <div class="text-[11px] text-slate-400 pt-1">
+            启动后在本地监听 <code class="text-indigo-300">socks5h://127.0.0.1:1080</code>，直接使用。
+          </div>
+        </div>
+      </div>
+
       <!-- Method 1: SOCKS5h Proxy -->
       <div class="glass p-5 rounded-xl space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-white flex items-center gap-2">
-            <span>⚡ 方式一：SOCKS5h 代理 (按需直连)</span>
+            <span>⚡ 方式一：Tailnet SOCKS5h</span>
           </h2>
-          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">免切全局路由</span>
+          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-300">内网点对点</span>
         </div>
         <p class="text-xs text-slate-400 leading-relaxed">
-          连接到同一 Tailnet 的任何电脑/手机，可直接将本地浏览器或命令行代理指向该节点的 1080 端口（支持远程 DNS 解析）：
+          连接到同一 Tailnet 的任何设备，可直接将代理指向该节点的 Tailscale IP (需本地打通 P2P，否则走官方中继限速)：
         </p>
         <div class="space-y-1.5">
           <div class="text-xs text-slate-400">代理连接地址 (SOCKS5h)：</div>
@@ -84,15 +104,6 @@
             <input id="proxy-socks" readonly class="flex-1 px-3 py-2 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300" />
             <button onclick="copyVal('proxy-socks')" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-white">复制</button>
           </div>
-          <div class="text-xs text-slate-400 pt-1">HTTP 代理地址 (可选)：</div>
-          <div class="flex gap-2">
-            <input id="proxy-http" readonly class="flex-1 px-3 py-2 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300" />
-            <button onclick="copyVal('proxy-http')" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-xs text-white">复制</button>
-          </div>
-        </div>
-        <div class="pt-2">
-          <div class="text-xs text-slate-400 mb-1">测试命令 (cURL / 命令行)：</div>
-          <pre id="curl-cmd" class="p-2.5 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto"></pre>
         </div>
       </div>
 
@@ -100,23 +111,18 @@
       <div class="glass p-5 rounded-xl space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="text-base font-semibold text-white flex items-center gap-2">
-            <span>🌍 方式二：全局 Exit Node 出口</span>
+            <span>🌍 方式二：全局 Exit Node</span>
           </h2>
           <span class="text-[10px] px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800 text-indigo-300">系统全局分流</span>
         </div>
         <p class="text-xs text-slate-400 leading-relaxed">
-          作为 Tailscale 官方 Exit Node，将整个设备的网络流量通过该节点转发（出口 IP 为德国 Hetzner）：
+          作为 Tailscale 官方 Exit Node，接管整机流量（出口 IP 为德国 Hetzner）：
         </p>
         <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1.5">
-          <li>
-            前往 <a href="https://login.tailscale.com/admin/machines" target="_blank" class="text-indigo-400 underline">Tailscale 机器管理后台</a>
-          </li>
-          <li>找到本节点名称（<code id="node-name-label" class="text-indigo-300">blitz-de-exit</code>）</li>
-          <li>点击右侧菜单 <code class="text-slate-400">...</code> ➔ <code class="text-slate-400">Edit route settings</code></li>
-          <li>勾选批准 <strong class="text-emerald-400">Use as exit node</strong></li>
-          <li>在客户端选择该节点为出口：
-            <pre class="mt-1.5 p-2 rounded bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300">tailscale set --exit-node=blitz-de-exit</pre>
-          </li>
+          <li>前往 <a href="https://login.tailscale.com/admin/machines" target="_blank" class="text-indigo-400 underline">Tailscale 管理后台</a></li>
+          <li>找到本节点 <code id="node-name-label" class="text-indigo-300">blitz-de-exit</code></li>
+          <li>点击 <code class="text-slate-400">...</code> ➔ 批准 <strong class="text-emerald-400">Use as exit node</strong></li>
+          <li>客户端执行: <code class="text-slate-300 font-mono">tailscale set --exit-node=blitz-de-exit</code></li>
         </ol>
       </div>
     </div>
