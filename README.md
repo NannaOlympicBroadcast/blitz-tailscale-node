@@ -78,7 +78,7 @@ curl -x socks5h://<TAILSCALE_IP>:1080 https://ipinfo.io/json
 
 #### 极速启动与测速（Windows / macOS / Linux 均通用）
 
-**Step 1. 运行本地隧道守护客户端（纯 Python 标准库，零 pip 依赖）**
+**Step 1. 运行本地隧道守护客户端（兼容 Python 3.7+ 全系列，零外部 pip 依赖）**
 ```powershell
 # 在 Windows PowerShell 下执行（自动从容器拉取最新客户端并运行）
 irm https://ts-exit.blitz48.blitz.cloud/client/tunnel.py -OutFile tunnel.py; python tunnel.py

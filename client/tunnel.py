@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Blitz High-Speed WebSocket SOCKS5 Tunnel Client (Zero Dependencies)
 通过 Cloudflare Anycast CDN 与 Blitz 德国出口建立极速 WebSocket 隧道，
@@ -22,7 +23,7 @@ DEFAULT_TOKEN = "snh48ssr"
 DEFAULT_PORT = 1080
 
 
-def create_ws_client_handshake(host: str, port: int, path: str, token: str) -> tuple[bytes, str]:
+def create_ws_client_handshake(host: str, port: int, path: str, token: str) -> Tuple[bytes, str]:
     sec_key = base64.b64encode(secrets.token_bytes(16)).decode()
     sep = "&" if "?" in path else "?"
     full_path = f"{path}{sep}token={urllib.parse.quote(token)}"
@@ -40,7 +41,7 @@ def create_ws_client_handshake(host: str, port: int, path: str, token: str) -> t
     return "\r\n".join(headers).encode("latin1"), sec_key
 
 
-async def ws_connect(url: str, token: str) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+async def ws_connect(url: str, token: str) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
     p = urllib.parse.urlparse(url)
     is_ssl = p.scheme in ("wss", "https")
     host = p.hostname or "localhost"
